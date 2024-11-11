@@ -1,7 +1,7 @@
 {
   "name": "discordbot",
   "version": "1.0.0",
-  "description": "Fumbler",
+  "description": "Mr. Money",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,7 +10,8 @@
   "license": "ISC",
   "keywords": [],
   "dependencies": {
-    "discord.js": "^14.16.3"
+    "discord.js": "^14.16.3",
+    "fs": "^0.0.1-security"
   },
   "devDependencies": {
     "eslint": "^9.14.0"
