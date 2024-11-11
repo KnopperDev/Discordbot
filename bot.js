@@ -1,38 +1,46 @@
-const { Client, Intents } = require('discord.js');
-const { playSlots, playRoulette, startBlackjack, hitBlackjack, standBlackjack } = require('./games');
-const { getBalance, updateBalance, loadBalances } = require('./balance');
+const { Client, Collection, GatewayIntentBits } = require('discord.js');
 const fs = require('fs');
-
-const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
-const prefix = '!';
-
-client.on('messageCreate', async message => {
-    if (!message.content.startsWith(prefix) || message.author.bot) return;
-    const args = message.content.slice(prefix.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
-    const userId = message.author.id;
-
-    if (command === 'balance') {
-        const balance = getBalance(userId);
-        message.channel.send(`${message.author}, you have ${balance} chips.`);
-    } else if (command === 'slots') {
-        const result = playSlots(userId);
-        message.channel.send(`${message.author}, you rolled ${result.display} and ${result.message}`);
-    } else if (command === 'blackjack') {
-        const gameStatus = startBlackjack(userId);
-        message.channel.send(gameStatus.message);
-    } else if (command === 'hit') {
-        const gameStatus = hitBlackjack(userId);
-        message.channel.send(gameStatus.message);
-    } else if (command === 'stand') {
-        const gameStatus = standBlackjack(userId);
-        message.channel.send(gameStatus.message);
-    }
+require('dotenv').config();  // Zorg ervoor dat de .env variabelen geladen worden
+ 
+// Maak de client aan
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds],
 });
-
+ 
+// Maak een verzameling voor de commando's
+client.commands = new Collection();
+ 
+// Lees de bestanden in de `commands` map
+const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+ 
+// Laad elk commando en voeg het toe aan de collectie
+for (const file of commandFiles) {
+  const command = require(`./commands/${file}`);
+  client.commands.set(command.data.name, command);
+}
+ 
+// Wanneer de bot klaar is
 client.once('ready', () => {
-    console.log('Casino Bot is ready!');
-    loadBalances();
+  console.log(`Ingelogd als ${client.user.tag}!`);
 });
-
-client.login('YOUR_BOT_TOKEN');
+ 
+// Wanneer er een interactie is (bijvoorbeeld een slash command)
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isCommand()) return;
+ 
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+ 
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+    await interaction.reply({
+      content: 'Er is een fout opgetreden bij het uitvoeren van dit commando.',
+      ephemeral: true,
+    });
+  }
+});
+ 
+// Log in de bot met de token uit je .env bestand
+client.login(process.env.BOT_TOKEN);
