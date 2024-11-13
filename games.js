@@ -10,7 +10,7 @@ function playSlots(userId) {
         { symbol: "💎", probability: 0.1, payout: [0, 0, 100] },   // Diamond - rare, high payout for 3
         { symbol: "BAR", probability: 0.05, payout: [0, 0, 500] }   // BAR - rare, highest payout for 3
     ];
-
+    
     // Utility function to pick a symbol based on probability
     function pickSymbol() {
         const rand = Math.random();
