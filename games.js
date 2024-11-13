@@ -39,6 +39,7 @@ function playSlots(userId) {
     // Get balance and deduct the bet amount
     const balance = getBalance(userId);
     const betAmount = 50; // Cost per spin
+
     updateBalance(userId, -betAmount);
 
     // Check for payouts based on new pattern requirements

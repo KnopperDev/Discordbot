@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { playSlots } = require('../games');
+const { getBalance } = require('../balance');
 
 const activeUsers = new Set();  // Set to track users who are currently playing slots
 
@@ -9,6 +10,15 @@ module.exports = {
         .setDescription('Play a slot game for a chance to win!'),
     async execute(interaction) {
         const userId = interaction.user.id;
+        const balance = getBalance(userId);
+
+        if (balance < 50) {
+            // Send a reply to the user when their balance is too low
+            return interaction.reply({
+                content: `You don't have enough chips to place this bet. Your balance is ${balance} chips.`,
+                ephemeral: true  // Make the message visible only to the user
+            });
+        }
 
         // Check if the user is already in the middle of a game
         if (activeUsers.has(userId)) {
