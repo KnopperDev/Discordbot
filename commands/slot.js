@@ -7,15 +7,20 @@ const activeUsers = new Set();  // Set to track users who are currently playing 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('slots')
-        .setDescription('Play a slot game for a chance to win!'),
+        .setDescription('Play a slot game for a chance to win!')
+        .addIntegerOption(option =>
+            option.setName('bet_amount')
+            .setDescription('The amount of chips to bet.')
+            .setRequired(true)),
     async execute(interaction) {
         const userId = interaction.user.id;
         const balance = getBalance(userId);
+        const betAmount = interaction.options.getInteger('bet_amount');
 
-        if (balance < 50) {
+        if (balance < betAmount || betAmount <= 0) {
             // Send a reply to the user when their balance is too low
             return interaction.reply({
-                content: `You don't have enough chips to place this bet. Your balance is ${balance} chips.`,
+                content: `Invalid bet. Your balance is ${balance} chips.`,
                 ephemeral: true  // Make the message visible only to the user
             });
         }
@@ -67,7 +72,7 @@ module.exports = {
         }
 
         // Retrieve the actual result of the slot game after fake spins
-        const result = playSlots(userId);
+        const result = playSlots(userId, betAmount);
         const finalRoll = result.display.split(" ");  // Final symbols for each reel
 
         // After the fake spins, update the embed with the final result

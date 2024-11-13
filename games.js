@@ -1,6 +1,6 @@
 const { getBalance, updateBalance } = require('./balance');
 
-function playSlots(userId) {
+function playSlots(userId, betAmount) {
     // Define symbols with adjusted probabilities and payout values
     const symbols = [
         { symbol: "🍒", probability: 0.15, payout: [1, 5, 10] },  // Cherry - reduced probability
@@ -38,7 +38,6 @@ function playSlots(userId) {
 
     // Get balance and deduct the bet amount
     const balance = getBalance(userId);
-    const betAmount = 50; // Cost per spin
 
     updateBalance(userId, -betAmount);
 
