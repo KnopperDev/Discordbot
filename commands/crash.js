@@ -25,11 +25,18 @@ module.exports = {
         // Deduct the bet amount from the user's balance
         updateBalance(userId, -betAmount);
 
-        // Generate a random crash multiplier between 1.5x and 10x (for increased tension)
-        const crashMultiplier = (Math.random() * 8.5 + 1.5).toFixed(2);
+        // Generate a random crash multiplier between 1x and 10x
+        function getRandomCrashMultiplier(min, max, skew) {
+            let randomNum = Math.pow(Math.random(), skew);
+            return (randomNum * (max - min) + min).toFixed(2);
+        }
+
+        const crashMultiplier = parseFloat(getRandomCrashMultiplier(1, 10, 3));
+        // console.log(`Crash Multiplier: ${crashMultiplier}`);
+
         let currentMultiplier = 1.0;
-        let increment = 0.1; // Initial increment
-        let cashedOut = false;
+        let increment = 0.1;
+        let gameEnded = false; // Flag to handle game state
 
         // Initial response
         await interaction.reply({
@@ -45,23 +52,51 @@ module.exports = {
             ]
         });
 
+        // Button interaction collector for "Cash Out" with no time limit
+        const filter = i => i.user.id === userId && i.customId === 'cash_out';
+        const collector = interaction.channel.createMessageComponentCollector({ filter, max: 1 });
+
+        collector.on('collect', async i => {
+            if (gameEnded) return; // If the game has ended, ignore the cash-out attempt
+            gameEnded = true; // Mark the game as ended
+
+            // If the player pressed "Cash Out" before crash
+            const winnings = Math.floor(betAmount * currentMultiplier);
+            updateBalance(userId, winnings);
+
+            await i.update({
+                content: `🎉 You cashed out at ${currentMultiplier.toFixed(2)}x!\nIt would crash at ${crashMultiplier}x.\nYou won ${winnings} chips! Your balance is now ${getBalance(userId)} chips.`,
+                components: []
+            });
+            clearInterval(multiplierInterval); // Stop multiplier updates
+        });
+
         // Function to update the multiplier and check for crash
         const multiplierInterval = setInterval(async () => {
-            increment *= 1.05; // Gradually increase the increment to accelerate the multiplier
-            currentMultiplier += increment; // Add the increment to the current multiplier
+            if (gameEnded) {
+                clearInterval(multiplierInterval); // Stop updates if game ended
+                return;
+            }
 
-            if (parseFloat(currentMultiplier.toFixed(2)) >= parseFloat(crashMultiplier)) {
-                clearInterval(multiplierInterval);
+            increment *= 1.05; // Increase the increment to accelerate the multiplier
+            currentMultiplier += increment;
 
-                // If the player hasn't cashed out when it crashes
-                if (!cashedOut) {
-                    await interaction.editReply({
-                        content: `💥 **Crash!** The multiplier crashed at ${crashMultiplier}x.\nYou lost your bet of ${betAmount} chips.`,
-                        components: []
-                    });
-                }
-            } else if (!cashedOut) {
-                // Update message with the current multiplier
+            // Check if the multiplier has reached or exceeded the crash multiplier
+            if (parseFloat(currentMultiplier.toFixed(2)) >= crashMultiplier) {
+                gameEnded = true; // Mark the game as ended
+                clearInterval(multiplierInterval); // Stop updating multiplier
+                collector.stop(); // Stop the collector to prevent further "Cash Out" attempts
+
+                // Inform the player about the crash
+                await interaction.editReply({
+                    content: `💥 **Crash!** The multiplier crashed at ${crashMultiplier}x.\nYou lost your bet of ${betAmount} chips.`,
+                    components: []
+                });
+                return;
+            }
+
+            // If not crashed and user hasn't cashed out, update the multiplier display
+            if (!gameEnded) {
                 await interaction.editReply({
                     content: `The multiplier is now ${currentMultiplier.toFixed(2)}x.\nClick "Cash Out" to secure your winnings!`,
                     components: [
@@ -74,35 +109,6 @@ module.exports = {
                     ]
                 });
             }
-        }, 1000); // Update every second
-
-        // Button interaction collector for "Cash Out"
-        const filter = i => i.user.id === userId && i.customId === 'cash_out';
-        const collector = interaction.channel.createMessageComponentCollector({ filter, max: 1, time: 15000 });
-
-        collector.on('collect', async i => {
-            cashedOut = true;
-            clearInterval(multiplierInterval);
-
-            // Calculate winnings
-            const winnings = Math.floor(betAmount * currentMultiplier);
-            updateBalance(userId, winnings);
-
-            await i.update({
-                content: `🎉 You cashed out at ${currentMultiplier.toFixed(2)}x!\nYou won ${winnings} chips! Your balance is now ${getBalance(userId)} chips.`,
-                components: []
-            });
-        });
-
-        collector.on('end', collected => {
-            if (collected.size === 0 && !cashedOut) {
-                // Handle timeout if the user didn't click "Cash Out"
-                clearInterval(multiplierInterval);
-                interaction.editReply({
-                    content: `Time ran out, and you didn't cash out in time! You lost ${betAmount} chips.`,
-                    components: []
-                });
-            }
-        });
+        }, 1000);
     }
 };
