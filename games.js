@@ -69,6 +69,60 @@ function playSlots(userId) {
     }
 }
 
+const redNumbers = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+const blackNumbers = new Set([2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35]);
+const greenNumber = 0;
+
+function playRoulette(userId, betType, betAmount) {
+    // Retrieve the user's balance
+    const balance = getBalance(userId);
+
+    // Check if the user has enough balance for the bet
+    if (balance < betAmount) {
+        return { message: `You don't have enough chips to place this bet. Your balance is ${balance} chips.` };
+    }
+
+    // Deduct the bet amount from the user's balance
+    updateBalance(userId, -betAmount);
+
+    // Generate a random spin outcome (0-36)
+    const outcome = Math.floor(Math.random() * 37);
+
+    let winnings = 0;
+
+    // Determine winnings based on the bet type
+    if (betType === 'red' || betType === 'black') {
+        const isRed = redNumbers.has(outcome);
+        const isBlack = blackNumbers.has(outcome);
+        
+        if ((betType === 'red' && isRed) || (betType === 'black' && isBlack)) {
+            winnings = betAmount * 2;
+        }
+    } else if (Number.isInteger(betType) && betType >= 0 && betType <= 36) {
+        // Check if the bet was on a specific number and if it matches the outcome
+        if (betType === outcome) {
+            winnings = betAmount * 36;
+        }
+    } else {
+        return { message: 'Invalid bet type. Please choose "red", "black", or a number between 0 and 36.' };
+    }
+
+    // Update balance if the user won
+    if (winnings > 0) {
+        updateBalance(userId, winnings);
+        return {
+            outcome,
+            message: `The ball landed on ${outcome}. You won ${winnings} chips! Your balance is now ${balance + winnings - betAmount} chips.`
+        };
+    } else {
+        return {
+            outcome,
+            message: `The ball landed on ${outcome}. You lost ${betAmount} chips. Your balance is now ${balance - betAmount} chips.`
+        };
+    }
+}
+
 module.exports = {
-    playSlots
+    playSlots,
+    playRoulette
 };
