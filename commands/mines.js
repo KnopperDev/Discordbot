@@ -36,7 +36,7 @@ module.exports = {
 
             const gridSize = 4;
             const totalTiles = gridSize * gridSize;
-            let baseMultiplier = 1 + (bombCount / totalTiles) * 3; // Set initial multiplier based on bomb density
+            const baseMultiplier = 1 + (bombCount / totalTiles) * 4; // Set initial multiplier based on bomb density
             let multiplier = baseMultiplier;
             let gameEnded = false;
             let winnings = 0;
@@ -50,7 +50,7 @@ module.exports = {
                 grid[pos] = 'bomb';
             }
 
-            // Function to update multiplier based on the number of revealed safe tiles
+            // Function to update multiplier based on revealed safe tiles
             const updateMultiplier = (revealedTiles, remainingSafeTiles) => {
                 const safeProbability = remainingSafeTiles / (totalTiles - revealedTiles);
                 multiplier = baseMultiplier * Math.pow(1 + (1 - safeProbability), 2); // Exponential scaling for risk
