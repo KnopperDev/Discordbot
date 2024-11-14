@@ -16,7 +16,10 @@ module.exports = {
         .addIntegerOption(option =>
             option.setName('bet_amount')
                 .setDescription('The amount of chips to bet.')
-                .setRequired(true)),
+                .setRequired(true)
+                .setMinValue(1)
+            ),
+                
                 
     async execute(interaction) {
         const userId = interaction.user.id;

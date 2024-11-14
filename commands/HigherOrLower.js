@@ -11,6 +11,7 @@ module.exports = {
             option.setName('bet')
             .setDescription('Amount of chips to bet')
             .setRequired(true)
+            .setMinValue(1)
         ),
     
     async execute(interaction) {
