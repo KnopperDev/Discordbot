@@ -35,19 +35,27 @@ module.exports = {
             updateBalance(userId, -betAmount);
 
             const gridSize = 4;
-            let baseMultiplier = 1 + bombCount * 0.15; // Higher base multiplier for more bombs
+            const totalTiles = gridSize * gridSize;
+            let baseMultiplier = 1 + (bombCount / totalTiles) * 3; // Set initial multiplier based on bomb density
             let multiplier = baseMultiplier;
             let gameEnded = false;
             let winnings = 0;
 
-            const grid = Array(gridSize * gridSize).fill('safe');
+            const grid = Array(totalTiles).fill('safe');
             for (let i = 0; i < bombCount; i++) {
                 let pos;
                 do {
-                    pos = Math.floor(Math.random() * gridSize * gridSize);
+                    pos = Math.floor(Math.random() * totalTiles);
                 } while (grid[pos] === 'bomb');
                 grid[pos] = 'bomb';
             }
+
+            // Function to update multiplier based on the number of revealed safe tiles
+            const updateMultiplier = (revealedTiles, remainingSafeTiles) => {
+                const safeProbability = remainingSafeTiles / (totalTiles - revealedTiles);
+                multiplier = baseMultiplier * Math.pow(1 + (1 - safeProbability), 2); // Exponential scaling for risk
+                winnings = Math.floor(betAmount * multiplier); // Calculate potential winnings
+            };
 
             const renderGrid = (revealAll = false) => {
                 const rows = [];
@@ -121,12 +129,10 @@ module.exports = {
                     grid[tileIndex] = 'clicked';
 
                     const remainingSafeTiles = grid.filter(tile => tile === 'safe').length;
-                    const revealedTiles = gridSize * gridSize - remainingSafeTiles - bombCount;
+                    const revealedTiles = totalTiles - remainingSafeTiles - bombCount;
 
-                    // Exponentially scale multiplier based on bombs and revealed safe tiles
-                    const scaleFactor = 0.1 + (bombCount / (gridSize * gridSize)) * 0.25;
-                    multiplier = baseMultiplier + revealedTiles * scaleFactor * Math.pow(1.1, revealedTiles);
-                    winnings = Math.floor(betAmount * multiplier);
+                    // Update multiplier and potential winnings
+                    updateMultiplier(revealedTiles, remainingSafeTiles);
 
                     if (remainingSafeTiles === 0) {
                         gameEnded = true;
