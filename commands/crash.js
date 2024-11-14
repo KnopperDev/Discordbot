@@ -31,7 +31,7 @@ module.exports = {
             return (randomNum * (max - min) + min).toFixed(2);
         }
 
-        const crashMultiplier = parseFloat(getRandomCrashMultiplier(1, 10, 3));
+        const crashMultiplier = parseFloat(getRandomCrashMultiplier(1, 10, 4.5));
         // console.log(`Crash Multiplier: ${crashMultiplier}`);
 
         let currentMultiplier = 1.0;
@@ -65,7 +65,7 @@ module.exports = {
             updateBalance(userId, winnings);
 
             await i.update({
-                content: `🎉 You cashed out at ${currentMultiplier.toFixed(2)}x!\nIt would crash at ${crashMultiplier}x.\nYou won ${winnings} chips! Your balance is now ${getBalance(userId)} chips.`,
+                content: `🎉 You cashed out at ${currentMultiplier.toFixed(2)}x!\nIt would have crashed at ${crashMultiplier}x.\nYou won ${winnings} chips! Your balance is now ${getBalance(userId)} chips.`,
                 components: []
             });
             clearInterval(multiplierInterval); // Stop multiplier updates

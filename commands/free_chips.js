@@ -17,7 +17,7 @@ module.exports = {
       });
     } else {
       await interaction.reply({
-        content: `${user_name}, your balance is ${user_balance} chips. I'll give you some extra chips, broke boy...`,
+        content: `${user_name}, your balance is ${user_balance} chips. I'll give you some extra chips.`,
         ephemeral: true
       });
       await updateBalance(user, 5000);  // Await updateBalance if it's async
