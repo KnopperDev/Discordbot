@@ -19,12 +19,9 @@ module.exports = {
         const balance = getBalance(userId);
         const betAmount = interaction.options.getInteger('bet_amount');
 
-        if (balance < betAmount || betAmount <= 0) {
-            // Send a reply to the user when their balance is too low
-            return interaction.reply({
-                content: `Invalid bet. Your balance is ${balance} chips.`,
-                ephemeral: true  // Make the message visible only to the user
-            });
+        if (balance < betAmount) {
+            await interaction.reply({ content: `You don't have enough chips to place this bet. Your balance is ${balance} chips.`, ephemeral: true });
+            return;
         }
 
         // Check if the user is already in the middle of a game

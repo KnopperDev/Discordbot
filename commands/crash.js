@@ -19,7 +19,7 @@ module.exports = {
 
         // Check if the user has enough balance for the bet
         if (balance < betAmount) {
-            await interaction.reply(`You don't have enough chips to place this bet. Your balance is ${balance} chips.`);
+            await interaction.reply({ content: `You don't have enough chips to place this bet. Your balance is ${balance} chips.`, ephemeral: true });
             return;
         }
 

@@ -31,14 +31,14 @@ module.exports = {
                 return;
             }
 
+            // Deduct the initial bet amount only once
             updateBalance(userId, -betAmount);
 
             const gridSize = 4;
-            let multiplier = 1 + (bombCount - 1) * 0.05; // Start at 1x, increase by 0.05x for each bomb
+            let baseMultiplier = 1 + bombCount * 0.15; // Higher base multiplier for more bombs
+            let multiplier = baseMultiplier;
             let gameEnded = false;
             let winnings = 0;
-
-            const baseMultiplier = multiplier; // Store the base multiplier
 
             const grid = Array(gridSize * gridSize).fill('safe');
             for (let i = 0; i < bombCount; i++) {
@@ -81,7 +81,6 @@ module.exports = {
                     rows.push(row);
                 }
 
-                // Add the Cash Out button row
                 if (!gameEnded) {
                     rows.push(new ActionRowBuilder().addComponents(
                         new ButtonBuilder()
@@ -111,7 +110,6 @@ module.exports = {
                 if (grid[tileIndex] === 'bomb') {
                     gameEnded = true;
                     winnings = 0;
-                    updateBalance(userId, -betAmount);
 
                     await i.update({
                         content: `💥 **You hit a bomb!** Game Over.\nYou lost your bet of ${betAmount} chips.`,
@@ -122,12 +120,12 @@ module.exports = {
                 } else {
                     grid[tileIndex] = 'clicked';
 
-                    // Incremental multiplier increase based on remaining safe tiles
                     const remainingSafeTiles = grid.filter(tile => tile === 'safe').length;
                     const revealedTiles = gridSize * gridSize - remainingSafeTiles - bombCount;
 
-                    // Increase multiplier slowly as more tiles are revealed
-                    multiplier = baseMultiplier + revealedTiles * (0.1 / (gridSize * gridSize - bombCount));
+                    // Exponentially scale multiplier based on bombs and revealed safe tiles
+                    const scaleFactor = 0.1 + (bombCount / (gridSize * gridSize)) * 0.25;
+                    multiplier = baseMultiplier + revealedTiles * scaleFactor * Math.pow(1.1, revealedTiles);
                     winnings = Math.floor(betAmount * multiplier);
 
                     if (remainingSafeTiles === 0) {
