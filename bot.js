@@ -59,6 +59,17 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
+const http = require('http');
+const PORT = process.env.PORT || 8000;
+
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('Bot is alive!');
+}).listen(PORT, () => {
+  console.log(`Health check server running on port ${PORT}`);
+});
+
+
 
 
 // Log in the bot with the token from the .env file
