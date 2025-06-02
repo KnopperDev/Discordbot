@@ -15,7 +15,7 @@ for (const file of commandFiles) {
 
 // Read environment variables
 const guildId = process.env.GUILD_ID;
-const deployGlobally = process.env.DEPLOY_GLOBALLY === 'true';
+const deployGlobally = process.env.DEPLOY_GLOBALLY === 'false';
 
 client.once('ready', async () => {
   try {
