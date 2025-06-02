@@ -8,10 +8,10 @@ const greenNumber = 0;
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('roulette')
-        .setDescription('Play a roulette game! Bet on red, black, or a specific number (0-36).')
+        .setDescription('Play a roulette game! Bet on red, black, green or a specific number (0-36).')
         .addStringOption(option =>
             option.setName('bet_type')
-                .setDescription('Choose "red", "black", or a number from 0 to 36.')
+                .setDescription('Choose "red", "black", "green" or a number from 0 to 36.')
                 .setRequired(true))
         .addIntegerOption(option =>
             option.setName('bet_amount')
@@ -26,7 +26,7 @@ module.exports = {
         const betTypeInput = interaction.options.getString('bet_type').toLowerCase();
         const betAmount = interaction.options.getInteger('bet_amount');
 
-        const betType = (betTypeInput === 'red' || betTypeInput === 'black')
+        const betType = (betTypeInput === 'red' || betTypeInput === 'black' || betTypeInput === 'green')
             ? betTypeInput
             : !isNaN(parseInt(betTypeInput)) && parseInt(betTypeInput) >= 0 && parseInt(betTypeInput) <= 36
                 ? parseInt(betTypeInput)
@@ -34,7 +34,7 @@ module.exports = {
 
         if (betType === null) {
             await interaction.reply({
-                content: `Invalid bet type. Please choose "red", "black", or a number between 0 and 36.`,
+                content: `Invalid bet type. Please choose "red", "black", "green" or a number between 0 and 36.`,
                 ephemeral: true
             });
             return;

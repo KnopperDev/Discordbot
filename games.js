@@ -91,11 +91,12 @@ function playRoulette(userId, betType, betAmount) {
     let winnings = 0;
 
     // Determine winnings based on the bet type
-    if (betType === 'red' || betType === 'black') {
+    if (betType === 'red' || betType === 'black' || betType === 'green') {
         const isRed = redNumbers.has(outcome);
         const isBlack = blackNumbers.has(outcome);
+        const isGreen = outcome === greenNumber;
         
-        if ((betType === 'red' && isRed) || (betType === 'black' && isBlack)) {
+        if ((betType === 'red' && isRed) || (betType === 'black' && isBlack || (betType === 'green' && isGreen))) {
             winnings = betAmount * 2;
         }
     } else if (Number.isInteger(betType) && betType >= 0 && betType <= 36) {
