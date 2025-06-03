@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getBalance, updateBalance } = require('../balance');
 
 const activeGames = new Map(); // Map to keep track of active games by user ID
@@ -16,19 +16,20 @@ module.exports = {
     
     async execute(interaction) {
         const userId = interaction.user.id;
+        const userName = interaction.user.username;
 
         // Check if a game is already active for this user
         if (activeGames.has(userId)) {
-            await interaction.reply({ content: 'You already have an active game! Finish it before starting a new one.', ephemeral: true });
+            await interaction.reply({ content: '🚫 You already have an active game! Finish it before starting a new one.', ephemeral: true });
             return;
         }
 
         const betAmount = interaction.options.getInteger('bet');
-        var balance = getBalance(userId);
+        let balance = getBalance(userId);
 
         // Check if the user has enough balance for the bet
         if (balance < betAmount) {
-            await interaction.reply({ content: `You don't have enough chips to place this bet. Your balance is ${balance} chips.`, ephemeral: true });
+            await interaction.reply({ content: `❌ You don't have enough chips to place this bet. Your balance is \`${balance}\` chips.`, ephemeral: true });
             return;
         }
 
@@ -43,27 +44,38 @@ module.exports = {
         let currentNumber = Math.floor(Math.random() * 100) + 1;
 
         let remainingTime = 15; // Time in seconds
-        const initialMessage = await interaction.reply({
-            content: `The current number is ${currentNumber}. Will the next number be **higher** or **lower**?\nTime remaining: **${remainingTime}** seconds`,
+
+        // Casino-style visual for the number
+        function getNumberVisual(num) {
+            return `🟦 \`Current: ${num}\``;
+        }
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('higher')
+                .setLabel('Higher')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('lower')
+                .setLabel('Lower')
+                .setStyle(ButtonStyle.Primary)
+        );
+
+        await interaction.reply({
+            content: `🎲 **Higher or Lower** 🎲\n\n**Bet:** \`${betAmount} chips\`\n${getNumberVisual(currentNumber)}\nWill the next number be **Higher** or **Lower**?\n⏳ Time remaining: \`${remainingTime}\` seconds`,
             ephemeral: true,
-            components: [
-                {
-                    type: 1,
-                    components: [
-                        { type: 2, label: 'Higher', style: 1, custom_id: 'higher' },
-                        { type: 2, label: 'Lower', style: 1, custom_id: 'lower' }
-                    ]
-                }
-            ]
+            components: [row]
         });
 
         // Update the countdown every second
         const countdownInterval = setInterval(async () => {
             remainingTime--;
             if (remainingTime > 0) {
-                await interaction.editReply({
-                    content: `The current number is ${currentNumber}. Will the next number be **higher** or **lower**?\nTime remaining: **${remainingTime}** seconds`
-                });
+                try {
+                    await interaction.editReply({
+                        content: `🎲 **Higher or Lower** 🎲\n\n**Bet:** \`${betAmount} chips\`\n${getNumberVisual(currentNumber)}\nWill the next number be **Higher** or **Lower**?\n⏳ Time remaining: \`${remainingTime}\` seconds`
+                    });
+                } catch (e) {}
             }
         }, 1000);
 
@@ -83,7 +95,7 @@ module.exports = {
                 nextNumber = Math.floor(Math.random() * 100) + 1;
             } while (nextNumber === currentNumber);
 
-            let resultMessage = `The next number was ${nextNumber}. `;
+            let resultMessage = `🎲 **Higher or Lower** 🎲\n\n**Bet:** \`${betAmount} chips\`\n${getNumberVisual(currentNumber)}\n**Your Guess:** \`${guess.charAt(0).toUpperCase() + guess.slice(1)}\`\n**Next Number:** 🟦 \`${nextNumber}\`\n\n`;
             let won = false;
 
             if ((guess === 'higher' && nextNumber > currentNumber) || (guess === 'lower' && nextNumber < currentNumber)) {
@@ -94,9 +106,9 @@ module.exports = {
                 const winnings = betAmount * 2;
                 updateBalance(userId, winnings);
                 balance = getBalance(userId);
-                resultMessage += `You guessed correctly and won ${winnings} chips! Current balance: ${balance} chips.`;
+                resultMessage += `🟩 **You guessed correctly and won \`${winnings}\` chips!**\n**New Balance:** \`${balance} chips\``;
             } else {
-                resultMessage += `You guessed incorrectly and lost ${betAmount} chips. Current balance: ${balance} chips.`;
+                resultMessage += `😢 **You guessed incorrectly and lost \`${betAmount}\` chips.**\n**New Balance:** \`${balance} chips\``;
             }
 
             // Reply with the result message
@@ -107,7 +119,7 @@ module.exports = {
             clearInterval(countdownInterval); // Stop countdown when time runs out
             activeGames.delete(userId); // Remove user from active games if time ran out
             if (collected.size === 0) {
-                interaction.editReply({ content: 'Time ran out! No guess was made you lost your bet.', components: [] });
+                interaction.editReply({ content: '⌛ **Time ran out!** No guess was made, you lost your bet.', components: [] });
             }
         });
     }
