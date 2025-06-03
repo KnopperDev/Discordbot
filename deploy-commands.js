@@ -1,36 +1,33 @@
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, SlashCommandBuilder } = require('discord.js');
 const fs = require('fs');
-require('dotenv').config(); // Load environment variables
+const path = require('path');
+require('dotenv').config(); // Ensure dotenv is loaded
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] }); // Enable necessary intents
+const client = new Client({ intents: [] });
 
-// Load commands from the `commands` folder
+// Read command files from the `commands` folder
 const commands = [];
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+
+// Define the guildId variable
+const guildId = process.env.GUILD_ID; // Ensure your .env contains GUILD_ID
 
 for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
   commands.push(command.data.toJSON());
 }
 
-// Read environment variables
-const guildId = process.env.GUILD_ID;
-const deployGlobally = process.env.DEPLOY_GLOBALLY === 'false';
-
 client.once('ready', async () => {
   try {
-    if (deployGlobally) {
-      // Register commands globally
-      await client.application.commands.set(commands);
-      console.log('Successfully registered commands globally.');
-    } else if (guildId) {
-      // Register commands for a specific guild
-      const guild = await client.guilds.fetch(guildId);
-      await guild.commands.set(commands);
-      console.log('Successfully registered commands for the specified guild.');
-    } else {
-      console.error('Error: Guild ID is missing and global deployment is not enabled.');
+    if (!guildId) {
+      throw new Error('Guild ID is not defined in .env');
     }
+
+    // Ensure the client has logged in and we can access the guild
+    const guild = await client.guilds.fetch(guildId); // Fetch the guild by ID
+    await guild.commands.set(commands); // Register commands in the specified guild
+    console.log('Successfully registered commands for the guild.');
+    
   } catch (error) {
     console.error('Error registering commands:', error);
   } finally {
@@ -38,4 +35,4 @@ client.once('ready', async () => {
   }
 });
 
-client.login(process.env.BOT_TOKEN); // Login using the bot token from .env
+client.login(process.env.BOT_TOKEN); // Use the token from .env
