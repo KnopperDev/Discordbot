@@ -1,5 +1,6 @@
 const fs = require('fs');
 const balances = {};
+const activeGames = {};
 
 function loadBalances() {
     if (fs.existsSync('balances.json')) {
@@ -13,25 +14,16 @@ function saveBalances() {
 }
 
 function getBalance(userId) {
-    // Initialize new users with 1000 chips only if they don't have an existing balance
-    if (!(userId in balances)) {
-        balances[userId] = 5000;  // New users get 1000 chips the first time
+    if (!balances[userId]) {
+        balances[userId] = 1000;
         saveBalances();
     }
     return balances[userId];
 }
 
 function updateBalance(userId, amount) {
-    if (!(userId in balances)) {
-        balances[userId] = 1000;  // New users start with 1000 chips
-    }
+    getBalance(userId);
     balances[userId] += amount;
-
-    // Prevent balance from going negative
-    if (balances[userId] < 0) {
-        balances[userId] = 0;
-    }
-
     saveBalances();
 }
 
