@@ -3,7 +3,7 @@ const { getBalance, updateBalance } = require('../balance');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('last_resort')
+    .setName('freechips')
     .setDescription('gives the user an extra amount of chips if they are broke!'),
   async execute(interaction) {
     const user = interaction.user.id;  // Use the correct property to get user ID
@@ -17,7 +17,7 @@ module.exports = {
       });
     } else {
       await interaction.reply({
-        content: `${user_name}, your balance is ${user_balance} chips. I'll give you some extra chips.`,
+        content: `${user_name}, your balance is ${user_balance} chips. I'll give you 5000 extra chips.`,
         ephemeral: true
       });
       await updateBalance(user, 5000);  // Await updateBalance if it's async
