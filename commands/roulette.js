@@ -1,9 +1,34 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { playRoulette } = require('../games');  
+const { getBalance, updateBalance } = require('../balance');
 
 const redNumbers = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 const blackNumbers = new Set([2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35]);
 const greenNumber = 0;
+
+function spinRoulette() {
+    return Math.floor(Math.random() * 37); // 0-36
+}
+
+function getColorEmoji(number) {
+    if (number === greenNumber) return '🟢';
+    if (redNumbers.has(number)) return '🔴';
+    if (blackNumbers.has(number)) return '⚫';
+    return '';
+}
+
+function getRouletteColor(number) {
+    if (number === greenNumber) return '#00FF00';
+    if (redNumbers.has(number)) return '#FF0000';
+    if (blackNumbers.has(number)) return '#000000';
+    return '#FFFFFF';
+}
+
+function getPayout(betType, outcome) {
+    if (betType === 'red' && redNumbers.has(outcome)) return 2;
+    if (betType === 'black' && blackNumbers.has(outcome)) return 2;
+    if (typeof betType === 'number' && betType === outcome) return 36;
+    return 0;
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -14,58 +39,69 @@ module.exports = {
                 .setDescription('Choose "red", "black", or a number from 0 to 36.')
                 .setRequired(true))
         .addIntegerOption(option =>
-            option.setName('bet_amount')
+            option.setName('bet')
                 .setDescription('The amount of chips to bet.')
                 .setRequired(true)
                 .setMinValue(1)
-            ),
-                
-                
+        ),
+
     async execute(interaction) {
         const userId = interaction.user.id;
+        const userName = interaction.user.username;
         const betTypeInput = interaction.options.getString('bet_type').toLowerCase();
-        const betAmount = interaction.options.getInteger('bet_amount');
+        const betAmount = interaction.options.getInteger('bet');
+        const balance = getBalance(userId);
 
-        const betType = (betTypeInput === 'red' || betTypeInput === 'black')
-            ? betTypeInput
-            : !isNaN(parseInt(betTypeInput)) && parseInt(betTypeInput) >= 0 && parseInt(betTypeInput) <= 36
-                ? parseInt(betTypeInput)
-                : null;
-
-        if (betType === null) {
+        // Validate bet type
+        let betType;
+        if (betTypeInput === 'red' || betTypeInput === 'black') {
+            betType = betTypeInput;
+        } else if (!isNaN(parseInt(betTypeInput)) && parseInt(betTypeInput) >= 0 && parseInt(betTypeInput) <= 36) {
+            betType = parseInt(betTypeInput);
+        } else {
             await interaction.reply({
-                content: `Invalid bet type. Please choose "red", "black", or a number between 0 and 36.`,
+                content: `❌ Invalid bet type. Please choose "red", "black", or a number between 0 and 36.`,
                 ephemeral: true
             });
             return;
         }
 
-        const result = playRoulette(userId, betType, betAmount);
-
-        let color;
-        let outcomeText;
-        
-        if (result.outcome === greenNumber) {
-            color = '#00FF00';
-            outcomeText = `🟢 **${result.outcome}**`;
-        } else if (redNumbers.has(result.outcome)) {
-            color = '#FF0000';
-            outcomeText = `🔴 **${result.outcome}**`;
-        } else if (blackNumbers.has(result.outcome)) {
-            color = '#000000';
-            outcomeText = `⚫ **${result.outcome}**`;
-        } else {
-            color = '#FFFFFF';
-            outcomeText = `**${result.outcome}**`;
+        // Check balance
+        if (balance < betAmount) {
+            await interaction.reply({
+                content: `❌ You don't have enough chips to bet \`${betAmount}\`. Your balance: \`${balance}\` chips.`,
+                ephemeral: true
+            });
+            return;
         }
 
+        // Deduct bet
+        updateBalance(userId, -betAmount);
+
+        // Spin the wheel
+        const outcome = spinRoulette();
+        const payout = getPayout(betType, outcome);
+        let winnings = 0;
+        let resultMsg = '';
+
+        if (payout > 0) {
+            winnings = betAmount * payout;
+            updateBalance(userId, winnings);
+            resultMsg = `🎉 **You won \`${winnings}\` chips!**\n**New Balance:** \`${getBalance(userId)} chips\``;
+        } else {
+            resultMsg = `😢 **You lost \`${betAmount}\` chips.**\n**New Balance:** \`${getBalance(userId)} chips\``;
+        }
+
+        // Build the embed
         const embed = new EmbedBuilder()
-            .setTitle(`${interaction.user.username}'s Roulette Game`)
-            .setDescription(`You bet on **${betType}** with **${betAmount} chips**.\n\n **The ball landed on:** ${outcomeText}`)
-            .setColor(color)
-            .addFields(
-                { name: 'Result', value: result.message }
-            );
+            .setTitle(`🎰 ${userName}'s Roulette Game`)
+            .setDescription(
+                `**Your Bet:** \`${typeof betType === 'number' ? betType : betType.charAt(0).toUpperCase() + betType.slice(1)}\`\n` +
+                `**Bet Amount:** \`${betAmount} chips\`\n\n` +
+                `**The ball landed on:** ${getColorEmoji(outcome)} \`${outcome}\``
+            )
+            .setColor(getRouletteColor(outcome))
+            .addFields({ name: 'Result', value: resultMsg });
 
         await interaction.reply({
             embeds: [embed],

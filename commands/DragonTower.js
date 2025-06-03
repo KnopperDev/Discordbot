@@ -16,9 +16,9 @@ module.exports = {
                 .setDescription('Risk level')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'Easy', value: 'easy' },
-                    { name: 'Medium', value: 'medium' },
-                    { name: 'Hard', value: 'hard' }
+                    { name: '🟢 Easy', value: 'easy' },
+                    { name: '🟡 Medium', value: 'medium' },
+                    { name: '🔴 Hard', value: 'hard' }
                 )
         ),
 
@@ -48,121 +48,151 @@ module.exports = {
         let cashedOut = false;
         let currentMultiplier = 0;
 
-        const buildTowerMessage = (highlightLevel = null) => {
-            return tower
-                .map((row, i) => {
-                    return new ActionRowBuilder().addComponents(
-                        row.map((tile, j) => {
-                            const disabled = i !== highlightLevel || tile !== '⬜';
-                            let style = ButtonStyle.Secondary;
-                            if (tile === '✅') style = ButtonStyle.Success;
-                            if (tile === '💣') style = ButtonStyle.Danger;
+        // Visualize the tower as text for a casino feel
+        function getTowerVisual(tower, currentLevel, bombed, cashedOut) {
+            let visual = '';
+            for (let i = tower.length - 1; i >= 0; i--) {
+                for (let j = 0; j < 3; j++) {
+                    let tile = tower[i][j];
+                    if (tile === '✅') visual += '🟩';
+                    else if (tile === '💣') visual += '💥';
+                    else if (i === currentLevel && !bombed && !cashedOut) visual += '🟦';
+                    else visual += '⬜';
+                }
+                visual += `  Level ${i + 1}\n`;
+            }
+            return visual;
+        }
 
-                            return new ButtonBuilder()
-                                .setCustomId(`tile_${i}_${j}`)
-                                .setLabel(tile)
-                                .setStyle(style)
-                                .setDisabled(disabled);
-                        })
-                    );
-                })
-                .reverse();
+        const buildTowerButtons = (highlightLevel = null, bombed = false, cashedOut = false) => {
+            // Only current level is enabled, others are disabled
+            return [
+                new ActionRowBuilder().addComponents(
+                    [0, 1, 2].map(j => {
+                        let style = ButtonStyle.Secondary;
+                        let label = '⬜';
+                        if (tower[highlightLevel][j] === '✅') {
+                            style = ButtonStyle.Success;
+                            label = '🟩';
+                        } else if (tower[highlightLevel][j] === '💣') {
+                            style = ButtonStyle.Danger;
+                            label = '💥';
+                        } else if (highlightLevel === level && !bombed && !cashedOut) {
+                            style = ButtonStyle.Primary;
+                            label = '🟦';
+                        }
+                        return new ButtonBuilder()
+                            .setCustomId(`tile_${highlightLevel}_${j}`)
+                            .setLabel(label)
+                            .setStyle(style)
+                            .setDisabled(bombed || cashedOut || highlightLevel !== level || tower[highlightLevel][j] !== '⬜');
+                    })
+                )
+            ];
         };
 
-        const updateLevel = async () => {
-            if (level >= maxLevels) {
+        const buildCashoutButton = (disabled = false) => {
+            return new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('cashout')
+                    .setLabel(`💰 Cash Out (x${(1 + currentMultiplier).toFixed(2)} = ${Math.round(bet + winnings)} chips)`)
+                    .setStyle(ButtonStyle.Success)
+                    .setDisabled(disabled)
+            );
+        };
+
+        const updateLevel = async (bombed = false) => {
+            let content;
+            if (bombed) {
+                content = `🐲 **Dragon Tower** 🐲\n\n${getTowerVisual(tower, level, true, false)}\n💥 You hit a dragon on level ${level + 1}! You lost **${bet} chips**.`;
+            } else if (cashedOut) {
+                content = `🐲 **Dragon Tower** 🐲\n\n${getTowerVisual(tower, level, false, true)}\n💰 You cashed out with **${Math.round(bet + winnings)} chips**! (Multiplier: x${(1 + currentMultiplier).toFixed(2)})`;
+            } else if (level >= maxLevels) {
                 updateBalance(userId, bet + winnings);
-                await interaction.editReply({
-                    content: `🎉 You reached the top!\nYou won **${Math.round(bet + winnings)} chips**! (Multiplier: x${(1 + currentMultiplier).toFixed(2)})`,
-                    components: buildTowerMessage()
+                content = `🐲 **Dragon Tower** 🐲\n\n${getTowerVisual(tower, level - 1, false, true)}\n🎉 You reached the top!\nYou won **${Math.round(bet + winnings)} chips**! (Multiplier: x${(1 + currentMultiplier).toFixed(2)})`;
+            } else {
+                const percent = Math.round(dragonChance * 100);
+                content = `🐲 **Dragon Tower** 🐲\n\n**Bet:** \`${bet} chips\` | **Risk:** \`${risk.charAt(0).toUpperCase() + risk.slice(1)}\`\n${getTowerVisual(tower, level, false, false)}\n🗼 **Level ${level + 1}** — Choose a tile!\n**Dragon chance this row:** \`${percent}%\`\n**Current Multiplier:** \`x${(1 + currentMultiplier).toFixed(2)}\`\n**Potential Cashout:** \`${Math.round(bet + winnings)} chips\``;
+            }
+
+            let components = [];
+            if (!bombed && !cashedOut && level < maxLevels) {
+                components = buildTowerButtons(level);
+                if (level > 0) components.push(buildCashoutButton());
+            } else if (cashedOut && level > 0) {
+                components = buildTowerButtons(level - 1, false, true);
+            } else if (bombed && level > 0) {
+                components = buildTowerButtons(level, true, false);
+            }
+
+            await interaction.editReply({
+                content,
+                components
+            });
+        };
+
+        await interaction.reply({ content: '🧱 Setting up your tower...', ephemeral: true, components: [] });
+        updateLevel();
+
+        const filter = i => i.user.id === userId;
+        const collector = interaction.channel.createMessageComponentCollector({ filter, time: 20000 });
+
+        collector.on('collect', async btn => {
+            if (cashedOut) return;
+            if (btn.customId === 'cashout') {
+                cashedOut = true;
+                await btn.deferUpdate();
+                updateBalance(userId, bet + winnings);
+                await updateLevel(false, true);
+                collector.stop();
+                return;
+            }
+
+            const parts = btn.customId.split("_");
+            if (parts.length !== 3 || parts[0] !== "tile") {
+                await btn.reply({
+                    content: "❌ Invalid tile interaction.",
+                    ephemeral: true,
                 });
                 return;
             }
 
-            const components = [...buildTowerMessage(level)];
+            const levelClicked = parseInt(parts[1]);
+            const tileIndex = parseInt(parts[2]);
 
-            // Add cashout button if not first level
-            if (level > 0) {
-                components.push(new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('cashout')
-                        .setLabel(`💰 Cash Out (x${(1 + currentMultiplier).toFixed(2)} = ${Math.round(bet + winnings)} chips)`)
-                        .setStyle(ButtonStyle.Success)
-                ));
+            if (levelClicked !== level || isNaN(tileIndex)) {
+                await btn.reply({
+                    content: "❌ Invalid tile selected.",
+                    ephemeral: true,
+                });
+                return;
             }
 
-            await interaction.editReply({
-                content: `🗼 Level ${level + 1} — Choose a tile!\nCurrent Multiplier: x${(1 + currentMultiplier).toFixed(2)}\nPotential Cashout: **${Math.round(bet + winnings)} chips**`,
-                components
-            });
+            await btn.deferUpdate();
 
-            const filter = i => i.user.id === userId;
-            const collector = interaction.channel.createMessageComponentCollector({ filter, time: 20000 });
+            // Only one dragon per row, but only if the random chance triggers
+            const dragonTile = Math.floor(Math.random() * 3);
+            const isDragon = Math.random() < dragonChance && tileIndex === dragonTile;
 
-            collector.on('collect', async btn => {
-                if (btn.customId === 'cashout') {
-                    cashedOut = true;
-                    await btn.deferUpdate();
-                    updateBalance(userId, bet + winnings);
-                    await interaction.editReply({
-                        content: `💰 You cashed out with **${Math.round(bet + winnings)} chips**! (Multiplier: x${(1 + currentMultiplier).toFixed(2)})`,
-                        components: buildTowerMessage()
-                    });
-                    collector.stop();
-                    return;
-                }
+            if (isDragon) {
+                tower[level][tileIndex] = '💣';
+                await updateLevel(true);
+                collector.stop();
+                return;
+            } else {
+                tower[level][tileIndex] = '✅';
+                winnings += bet * perLevelMultiplier;
+                currentMultiplier += perLevelMultiplier;
+                level++;
+                await updateLevel();
+                if (level >= maxLevels) collector.stop();
+            }
+        });
 
-                const parts = btn.customId.split("_");
-                if (parts.length !== 3 || parts[0] !== "tile") {
-                    await btn.reply({
-                        content: "❌ Invalid tile interaction.",
-                        ephemeral: true,
-                    });
-                    return;
-                }
-
-                const levelClicked = parseInt(parts[1]);
-                const tileIndex = parseInt(parts[2]);
-
-                if (levelClicked !== level || isNaN(tileIndex)) {
-                    await btn.reply({
-                        content: "❌ Invalid tile selected.",
-                        ephemeral: true,
-                    });
-                    return;
-                }
-
-                await btn.deferUpdate();
-
-                const dragonTile = Math.floor(Math.random() * 3);
-                const isDragon = Math.random() < dragonChance && tileIndex === dragonTile;
-
-                if (isDragon) {
-                    tower[level][tileIndex] = '💣';
-                    await interaction.editReply({
-                        content: `💥 You hit a dragon on level ${level + 1}! You lost **${bet} chips**.`,
-                        components: buildTowerMessage()
-                    });
-                    collector.stop();
-                    return;
-                } else {
-                    tower[level][tileIndex] = '✅';
-                    winnings += bet * perLevelMultiplier;
-                    currentMultiplier += perLevelMultiplier;
-                    level++;
-                    updateLevel();
-                    collector.stop();
-                }
-            });
-
-            collector.on('end', c => {
-                if (c.size === 0 && !cashedOut) {
-                    interaction.editReply({ content: `⌛ You didn't pick in time. Game over.`, components: [] });
-                }
-            });
-        };
-
-        await interaction.reply({ content: '🧱 Setting up your tower...', components: [] });
-        updateLevel();
+        collector.on('end', c => {
+            if (c.size === 0 && !cashedOut && level < maxLevels) {
+                interaction.editReply({ content: `⌛ You didn't pick in time. Game over.`, components: [] });
+            }
+        });
     }
-}
+};

@@ -1,10 +1,19 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { getBalance, updateBalance } = require('../balance');
 
-// Track users with active games
 const activeCrashGames = new Set();
-// Track cooldowns: userId => timestamp when they can play again
 const crashCooldowns = new Map();
+
+function getCrashBar(current, steps = 10) {
+    // Show a progress bar: 🟦 for current, ⬜ for future
+    let visual = '';
+    for (let i = 1; i <= steps; i++) {
+        const threshold = 1 + (i - 1) * 1.5; // just for visual, not actual crash logic
+        if (current >= threshold) visual += '🟦';
+        else visual += '⬜';
+    }
+    return visual;
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,7 +30,7 @@ module.exports = {
         const userId = interaction.user.id;
         const now = Date.now();
 
-        // Check if user is in cooldown
+        // Cooldown check
         if (crashCooldowns.has(userId)) {
             const availableAt = crashCooldowns.get(userId);
             if (now < availableAt) {
@@ -48,18 +57,16 @@ module.exports = {
 
         if (balance < betAmount) {
             await interaction.reply({
-                content: `You don't have enough chips to place this bet. Your balance is ${balance} chips.`,
+                content: `❌ You don't have enough chips to place this bet. Your balance is ${balance} chips.`,
                 ephemeral: true
             });
             return;
         }
 
-        // Mark this user as having an active game
         activeCrashGames.add(userId);
-
         updateBalance(userId, -betAmount);
 
-        // Stake-style crash multiplier: 1/(1-r), capped at 100x
+        // Crash multiplier is secret until the end!
         function getRandomCrashMultiplier() {
             const r = Math.random();
             const rawMultiplier = 1 / (1 - r);
@@ -73,23 +80,23 @@ module.exports = {
 
         function getCashOutButton(disabled = false) {
             return [
-                {
-                    type: 1,
-                    components: [
-                        {
-                            type: 2,
-                            label: 'Cash Out',
-                            style: 3,
-                            custom_id: 'cash_out',
-                            disabled
-                        }
-                    ]
-                }
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('cash_out')
+                        .setLabel('💰 Cash Out')
+                        .setStyle(ButtonStyle.Success)
+                        .setDisabled(disabled)
+                )
             ];
         }
 
+        function getCrashVisual(current) {
+            let bar = getCrashBar(current);
+            return `${bar}\n🟦 **Rising...**\n**Current Multiplier:** \`x${current.toFixed(2)}\`\n`;
+        }
+
         await interaction.reply({
-            content: `The game has started! Your bet: ${betAmount} chips.\nMultiplier: ${currentMultiplier.toFixed(2)}x`,
+            content: `🎲 **Crash Casino** 🎲\n\n**Bet:** \`${betAmount} chips\`\n${getCrashVisual(currentMultiplier)}\nClick **Cash Out** before it crashes!`,
             ephemeral: true,
             components: getCashOutButton(false)
         });
@@ -97,13 +104,12 @@ module.exports = {
         const filter = i => i.user.id === userId && i.customId === 'cash_out';
         const collector = interaction.channel.createMessageComponentCollector({ filter, max: 1 });
 
-        // Helper to clean up after game ends (with cooldown)
         function endGameCleanup() {
             activeCrashGames.delete(userId);
             crashCooldowns.set(userId, Date.now() + 1000); // 1 second cooldown
             setTimeout(() => {
                 crashCooldowns.delete(userId);
-            }, 1100); // A little buffer to ensure the cooldown is over
+            }, 1100);
         }
 
         collector.on('collect', async i => {
@@ -114,7 +120,7 @@ module.exports = {
             updateBalance(userId, winnings);
 
             await i.update({
-                content: `🎉 You cashed out at ${currentMultiplier.toFixed(2)}x!\nIt would have crashed at ${crashMultiplier}x.\nYou won ${winnings} chips! Your balance is now ${getBalance(userId)} chips.`,
+                content: `🎲 **Crash Casino** 🎲\n\n**Bet:** \`${betAmount} chips\`\n${getCrashBar(currentMultiplier)}\n💰 **Cashed Out!**\nYou cashed out at \`x${currentMultiplier.toFixed(2)}\`!\nIt would have crashed at \`x${crashMultiplier}\`.\n**Winnings:** \`${winnings} chips\`\n**New Balance:** \`${getBalance(userId)} chips\``,
                 components: getCashOutButton(true)
             });
             clearInterval(multiplierInterval);
@@ -123,17 +129,14 @@ module.exports = {
         });
 
         collector.on('end', async (collected, reason) => {
-            // If the game ended by crash, disable the button if not already
             if (!gameEnded && reason !== 'cashed_out') {
                 gameEnded = true;
                 try {
                     await interaction.editReply({
-                        content: `💥 **Crash!** The multiplier crashed at ${crashMultiplier}x.\nYou lost your bet of ${betAmount} chips.`,
+                        content: `🎲 **Crash Casino** 🎲\n\n**Bet:** \`${betAmount} chips\`\n${getCrashBar(crashMultiplier)}\n💥 **Crash!** The multiplier crashed at \`x${crashMultiplier}\`.\nYou lost your bet of \`${betAmount} chips\`.`,
                         components: getCashOutButton(true)
                     });
-                } catch (err) {
-                    // Message might already be updated, ignore
-                }
+                } catch (err) {}
                 endGameCleanup();
             }
         });
@@ -153,12 +156,10 @@ module.exports = {
                 collector.stop('crashed');
                 try {
                     await interaction.editReply({
-                        content: `💥 **Crash!** The multiplier crashed at ${crashMultiplier}x.\nYou lost your bet of ${betAmount} chips.`,
+                        content: `🎲 **Crash Casino** 🎲\n\n**Bet:** \`${betAmount} chips\`\n${getCrashBar(crashMultiplier)}\n💥 **Crash!** The multiplier crashed at \`x${crashMultiplier}\`.\nYou lost your bet of \`${betAmount} chips\`.`,
                         components: getCashOutButton(true)
                     });
-                } catch (err) {
-                    // Ignore if already updated
-                }
+                } catch (err) {}
                 endGameCleanup();
                 return;
             }
@@ -166,12 +167,10 @@ module.exports = {
             // Update multiplier if game is still running
             try {
                 await interaction.editReply({
-                    content: `The multiplier is now ${currentMultiplier.toFixed(2)}x.\nClick "Cash Out" to secure your winnings!`,
+                    content: `🎲 **Crash Casino** 🎲\n\n**Bet:** \`${betAmount} chips\`\n${getCrashVisual(currentMultiplier)}\nClick **Cash Out** before it crashes!`,
                     components: getCashOutButton(false)
                 });
-            } catch (err) {
-                // Ignore if already updated
-            }
+            } catch (err) {}
         }, 1000);
     }
 };

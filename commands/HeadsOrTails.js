@@ -3,7 +3,7 @@ const { getBalance, updateBalance } = require('../balance');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('headsortails') // must be all lowercase
+        .setName('headsortails')
         .setDescription('Play a Heads or Tails game!')
         .addIntegerOption(option => 
             option.setName('bet')
@@ -16,19 +16,23 @@ module.exports = {
                 .setDescription('Choose heads or tails')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'Heads', value: 'heads' },
-                    { name: 'Tails', value: 'tails' }
+                    { name: '🪙 Heads', value: 'heads' },
+                    { name: '🪙 Tails', value: 'tails' }
                 )
         ),
 
     async execute(interaction) {
         const userId = interaction.user.id;
+        const userName = interaction.user.username;
         const balance = getBalance(userId);
         const userChoice = interaction.options.getString('choice');
         const betAmount = interaction.options.getInteger('bet');
 
         if (balance < betAmount) {
-            await interaction.reply({ content: `You don't have enough chips to bet ${betAmount}. Your balance is ${balance}.`, ephemeral: true });
+            await interaction.reply({ 
+                content: `❌ **${userName}**, you don't have enough chips to bet \`${betAmount}\`.\nYour balance: \`${balance}\` chips.`,
+                ephemeral: true 
+            });
             return;
         }
 
@@ -37,17 +41,18 @@ module.exports = {
 
         // Simulate coin flip
         const result = Math.random() < 0.5 ? 'heads' : 'tails';
+        const resultEmoji = result === 'heads' ? '🪙' : '🪙';
 
-        let response = `You chose **${userChoice}**. The coin landed on **${result}**.\n`;
+        let response = `🎰 **Heads or Tails** 🎰\n\n**Bet:** \`${betAmount} chips\`\n**Your Choice:** \`${userChoice.charAt(0).toUpperCase() + userChoice.slice(1)}\`\n**Result:** ${resultEmoji} \`${result.charAt(0).toUpperCase() + result.slice(1)}\`\n\n`;
 
         if (userChoice === result) {
             const winnings = betAmount * 2;
             updateBalance(userId, winnings);
-            response += `🎉 You won **${winnings}** chips!\nYour balance is now ${getBalance(userId)} chips.`;
+            response += `🎉 **You won \`${winnings}\` chips!**\n**New Balance:** \`${getBalance(userId)} chips\``;
         } else {
-            response += `😢 You lost **${betAmount}** chips. Better luck next time! \nYour balance is now ${getBalance(userId)} chips.`;
+            response += `😢 **You lost \`${betAmount}\` chips.** Better luck next time!\n**New Balance:** \`${getBalance(userId)} chips\``;
         }
 
-        await interaction.reply({ content: response });
+        await interaction.reply({ content: response, ephemeral: true });
     }
 };
