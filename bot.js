@@ -69,8 +69,5 @@ http.createServer((req, res) => {
   console.log(`Health check server running on port ${PORT}`);
 });
 
-
-
-
 // Log in the bot with the token from the .env file
 client.login(process.env.BOT_TOKEN);
