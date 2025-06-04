@@ -39,5 +39,6 @@ module.exports = {
     loadBalances,
     saveBalances,
     getBalance,
-    updateBalance
+    updateBalance,
+    balances
 };
