@@ -1,4 +1,5 @@
 const { Client, Collection, GatewayIntentBits, REST, Routes } = require('discord.js');
+const { loadBalances, saveBalances, balances } = require('./balance');
 const fs = require('fs');
 require('dotenv').config();
 
@@ -37,9 +38,24 @@ const rest = new REST({ version: '10' }).setToken(process.env.BOT_TOKEN);
   }
 })();
 
-// When the bot is ready
-client.once('ready', () => {
+// After client is ready:
+client.once('ready', async () => {
   console.log(`Ingelogd als ${client.user.tag}!`);
+  loadBalances();
+
+  // For each member in every guild the bot is in
+  for (const guild of client.guilds.cache.values()) {
+      // Fetch all members to ensure you have everyone
+      await guild.members.fetch();
+      guild.members.cache.forEach(member => {
+          if (!member.user.bot && !(member.id in balances)) {
+              balances[member.id] = 5000;
+          }
+      });
+  }
+
+  saveBalances();
+  console.log('All members initialized with 5000 chips!');
 });
 
 // Handling interactions (commands)
