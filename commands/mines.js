@@ -23,7 +23,7 @@ module.exports = {
         )
         .addIntegerOption(option =>
             option.setName('bombs')
-                .setDescription('Number of bombs (1-8)')
+                .setDescription('Number of bombs (1-15)')
                 .setRequired(true)
                 .setMinValue(1)
                 .setMaxValue(15)
